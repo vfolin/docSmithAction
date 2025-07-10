@@ -1,0 +1,101 @@
+name: Export Changes
+
+on:
+  workflow_call:
+    inputs:
+      bucket_name:
+        required: true
+        type: string
+      aws_region:
+        required: true
+        type: string
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+
+jobs:
+  export-structure:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set Commit SHA and Date as GitHub Variables
+        run: |
+          COMMIT_ID="${GITHUB_SHA}"
+          
+          # Ensure we have a commit SHA
+          if [[ -z "$COMMIT_ID" ]]; then
+            echo "No commit SHA found. Using latest commit from main branch."
+            COMMIT_ID=$(git rev-parse HEAD)
+          fi
+          
+          # Get commit date in YYYY/MM/DD format
+          COMMIT_DATE=$(git show -s --format=%cd --date=format:'%Y/%m/%d' "$COMMIT_ID")
+          echo "COMMIT_ID=$COMMIT_ID" >> $GITHUB_ENV
+          echo "COMMIT_DATE=$COMMIT_DATE" >> $GITHUB_ENV
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Upload code to S3
+        run: |
+          aws s3 rm s3://${{ inputs.bucket_name }}/code/ --recursive 
+          aws s3 cp . s3://${{ inputs.bucket_name }}/code/ --recursive \
+            --exclude ".git/*" \
+            --exclude ".github/*" \
+            --exclude "README.md"
+
+      - name: Generate repository structure
+        run: |
+          git ls-tree -r --name-only HEAD > repo_structure_${{ env.COMMIT_ID }}.txt  
+
+      - name: Upload repository structure as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: repository-structure
+          path: repo_structure_${{ env.COMMIT_ID }}.txt
+
+      - name: Generate commit history
+        run: |
+          echo "Hash,Author,Date,Message" > commit-history.csv
+          git log --pretty=format:"%H,%an,%ai,%s" >> commit-history.csv
+
+      - name: Upload commit history as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: commit-history
+          path: commit-history.csv
+
+      - name: Extract diff of the commit
+        run: |
+          commit_id=$COMMIT_ID
+          git diff $commit_id^ > diff_${commit_id}.txt
+
+      - name: Save diff as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: commit-diff
+          path: diff_${{ env.COMMIT_ID }}.txt
+
+      - name: Upload Commit History to S3
+        run: |
+          aws s3 cp commit-history.csv s3://${{ inputs.bucket_name }}/codeChanges/commit-history.csv
+
+      - name: Upload Repository Structure and Commit diff to S3 in YYYY/MM/DD Subfolder
+        run: |
+            aws s3 cp repo_structure_${{ env.COMMIT_ID }}.txt s3://${{ inputs.bucket_name }}/codeChanges/$COMMIT_DATE/repo_structure_${{ env.COMMIT_ID }}.txt
+            aws s3 cp diff_${{ env.COMMIT_ID }}.txt s3://${{ inputs.bucket_name }}/codeChanges/$COMMIT_DATE/diff_${{ env.COMMIT_ID }}.txt
+
+      - name: Upload README.md to S3
+        run: |
+          aws s3 cp README.md s3://${{ inputs.bucket_name }}/documentation/README.md
