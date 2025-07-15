@@ -9,6 +9,14 @@ on:
       aws_region:
         required: true
         type: string
+      include_code:
+        required: false
+        type: string
+        default: "."
+      include_documentation:
+        required: false
+        type: string
+        default: ""
     secrets:
       AWS_ACCESS_KEY_ID:
         required: true
@@ -47,13 +55,34 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ inputs.aws_region }}
 
+      - name: Get inputs for S3 upload
+        run: |
+          IFS=',' read -r -a INCLUDE_CODE <<< "${{ inputs.include_code }}"
+          IFS=',' read -r -a INCLUDE_DOCUMENTATION <<< "${{ inputs.include_documentations }}"
+          
+          CODE_ARGS=""
+          
+          for item in "${INCLUDE_CODE[@]}"; do
+              CODE_ARGS+=" --include \"$item\""
+          done  
+          
+          for item in "${INCLUDE_DOCUMENTATION[@]}"; do
+              DOC_ARGS+=" --include \"$item\""
+          done
+
       - name: Upload code to S3
         run: |
+          
           aws s3 rm s3://${{ inputs.bucket_name }}/code/ --recursive 
-          aws s3 cp . s3://${{ inputs.bucket_name }}/code/ --recursive \
-            --exclude ".git/*" \
-            --exclude ".github/*" \
-            --exclude "README.md"
+          aws s3 cp . s3://${{ inputs.bucket_name }}/code/ --recursive \ $CODE_ARGS
+
+      - name: Upload documentation to S3
+        run: |
+          if [ -n "${{ inputs.include_documentation_folders }}" ]; then
+            aws s3 cp . s3://${{ inputs.bucket_name }}/documentation/ --recursive \ $DOC_ARGS
+          else
+            echo "No documentation folders specified for upload."
+          fi
 
       - name: Generate repository structure
         run: |
