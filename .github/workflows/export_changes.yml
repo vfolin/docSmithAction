@@ -64,12 +64,16 @@ jobs:
         run: |
           
           aws s3 rm s3://${{ inputs.bucket_name }}/code/ --recursive 
-          aws s3 cp ${INCLUDE_CODE[@]} s3://${{ inputs.bucket_name }}/code/ --recursive
+          for path in "${INCLUDE_CODE[@]}"; do
+            aws s3 cp "$path" s3://${{ inputs.bucket_name }}/code/ --recursive
+          done
 
       - name: Upload documentation to S3
         run: |
           if [ -n "${{ inputs.include_documentation_folders }}" ]; then
-            aws s3 cp ${INCLUDE_DOCUMENTATION[@]} s3://${{ inputs.bucket_name }}/documentation/ --recursive
+            for path in "${INCLUDE_DOCUMENTATION[@]}"; do
+              aws s3 cp "$path" s3://${{ inputs.bucket_name }}/documentation/ --recursive
+            done
           else
             echo "No documentation folders specified for upload."
           fi
