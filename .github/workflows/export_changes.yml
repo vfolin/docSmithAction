@@ -61,7 +61,7 @@ jobs:
           IFS=',' read -r -a INCLUDE_DOCUMENTATION <<< "${{ inputs.include_documentations }}"
           
           CODE_ARGS=""
-          DOC_ARGS = ""
+          DOC_ARGS=""
           
           for item in "${INCLUDE_CODE[@]}"; do
               CODE_ARGS+=" --include \"$item\""
