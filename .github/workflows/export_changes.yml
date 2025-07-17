@@ -56,7 +56,7 @@ jobs:
           echo "COMMIT_ID=$COMMIT_ID" >> $GITHUB_ENV
           echo "COMMIT_DATE=$COMMIT_DATE" >> $GITHUB_ENV
           
-          BASE_S3_PATH="s3://${{ vars.BUCKET_NAME }}/${{ github.event.repository.name }}"
+          BASE_S3_PATH="s3://${{ inputs.bucket_name }}/${{ github.event.repository.name }}"
           echo "BASE_S3_PATH=$BASE_S3_PATH" >> $GITHUB_ENV
 
       - name: Configure AWS credentials
