@@ -41,7 +41,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set Commit SHA and Date as GitHub Variables
+      - name: Set GitHub Variables
         run: |
           COMMIT_ID="${GITHUB_SHA}"
           
@@ -55,6 +55,9 @@ jobs:
           COMMIT_DATE=$(git show -s --format=%cd --date=format:'%Y/%m/%d' "$COMMIT_ID")
           echo "COMMIT_ID=$COMMIT_ID" >> $GITHUB_ENV
           echo "COMMIT_DATE=$COMMIT_DATE" >> $GITHUB_ENV
+          
+          BASE_S3_PATH="s3://${{ vars.BUCKET_NAME }}/${{ github.event.repository.name }}"
+          echo "BASE_S3_PATH=$BASE_S3_PATH" >> $GITHUB_ENV
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -66,9 +69,6 @@ jobs:
       - name: Upload filtered code and documentation to S3
         run: |
           set -e
-
-          BUCKET="${{ vars.BUCKET_NAME }}"
-          BASE_S3_PATH="s3://$BUCKET/${{ github.event.repository.name }}"
 
           # Inputs
           CODE_INCLUDE="${{ inputs.include_code }}"
@@ -176,9 +176,9 @@ jobs:
 
       - name: Upload Commit History to S3
         run: |
-          aws s3 cp commit-history.csv s3://${{ inputs.bucket_name }}/codeChanges/commit-history.csv
+          aws s3 cp commit-history.csv $BASE_S3_PATH/codeChanges/commit-history.csv
 
       - name: Upload Repository Structure and Commit diff to S3 in YYYY/MM/DD Subfolder
         run: |
-            aws s3 cp repo_structure_${{ env.COMMIT_ID }}.txt s3://${{ inputs.bucket_name }}/codeChanges/$COMMIT_DATE/repo_structure_${{ env.COMMIT_ID }}.txt
-            aws s3 cp diff_${{ env.COMMIT_ID }}.txt s3://${{ inputs.bucket_name }}/codeChanges/$COMMIT_DATE/diff_${{ env.COMMIT_ID }}.txt
+            aws s3 cp repo_structure_${{ env.COMMIT_ID }}.txt $BASE_S3_PATH/codeChanges/$COMMIT_DATE/repo_structure_${{ env.COMMIT_ID }}.txt
+            aws s3 cp diff_${{ env.COMMIT_ID }}.txt $BASE_S3_PATH/codeChanges/$COMMIT_DATE/diff_${{ env.COMMIT_ID }}.txt
