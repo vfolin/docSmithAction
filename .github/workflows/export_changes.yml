@@ -55,28 +55,68 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ inputs.aws_region }}
 
-      - name: Get inputs for S3 upload
-        run: |
-          IFS=',' read -r -a INCLUDE_CODE <<< "${{ inputs.include_code }}"
-          IFS=',' read -r -a INCLUDE_DOCUMENTATION <<< "${{ inputs.include_documentations }}"
+#      - name: Get inputs for S3 upload
+#        run: |
+#          IFS=',' read -r -a INCLUDE_CODE <<< "${{ inputs.include_code }}"
+#          IFS=',' read -r -a INCLUDE_DOCUMENTATION <<< "${{ inputs.include_documentations }}"
+#
+#      - name: Upload code to S3
+#        run: |
+#
+#          aws s3 rm s3://${{ inputs.bucket_name }}/code/ --recursive
+#          for path in "${INCLUDE_CODE[@]}"; do
+#            aws s3 cp "$path" s3://${{ inputs.bucket_name }}/code/ --recursive
+#          done
+#
+#      - name: Upload documentation to S3
+#        run: |
+#          if [ -n "${{ inputs.include_documentation_folders }}" ]; then
+#            for path in "${INCLUDE_DOCUMENTATION[@]}"; do
+#              aws s3 cp "$path" s3://${{ inputs.bucket_name }}/documentation/ --recursive
+#            done
+#          else
+#            echo "No documentation folders specified for upload."
+#          fi
 
-      - name: Upload code to S3
+      - name: Upload selected code and documentation to S3
         run: |
-          
-          aws s3 rm s3://${{ inputs.bucket_name }}/code/ --recursive 
-          for path in "${INCLUDE_CODE[@]}"; do
-            aws s3 cp "$path" s3://${{ inputs.bucket_name }}/code/ --recursive
+          set -e
+
+          CODE_PATHS="${{ inputs.include_code }}"
+          DOC_PATHS="${{ inputs.include_documentation }}"
+          BUCKET="${{ inputs.bucket_name }}"
+
+          # Funzione per upload: gestisce file e directory
+          upload_to_s3() {
+            local src=$1
+            local dest_prefix=$2
+
+            if [ -d "$src" ]; then
+              # Directory → upload ricorsivo all'interno di dest_prefix/src/
+              aws s3 cp "$src" "s3://$BUCKET/$dest_prefix/$src" --recursive
+            elif [ -f "$src" ]; then
+              # File → upload singolo
+              aws s3 cp "$src" "s3://$BUCKET/$dest_prefix/$src"
+            else
+              echo "Warning: '$src' non esiste, skip."
+            fi
+          }
+
+          # Pulizia cartelle di destinazione (per evitare residui)
+          aws s3 rm "s3://$BUCKET/code/" --recursive || true
+          aws s3 rm "s3://$BUCKET/docs/" --recursive || true
+
+          # Upload dei percorsi di codice
+          echo "Uploading code paths: $CODE_PATHS"
+          for path in $CODE_PATHS; do
+            upload_to_s3 "$path" "code"
           done
 
-      - name: Upload documentation to S3
-        run: |
-          if [ -n "${{ inputs.include_documentation_folders }}" ]; then
-            for path in "${INCLUDE_DOCUMENTATION[@]}"; do
-              aws s3 cp "$path" s3://${{ inputs.bucket_name }}/documentation/ --recursive
-            done
-          else
-            echo "No documentation folders specified for upload."
-          fi
+          # Upload dei percorsi di documentazione
+          echo "Uploading doc paths: $DOC_PATHS"
+          for path in $DOC_PATHS; do
+            upload_to_s3 "$path" "docs"
+          done
 
       - name: Generate repository structure
         run: |
