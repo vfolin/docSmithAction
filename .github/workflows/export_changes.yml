@@ -82,8 +82,8 @@ jobs:
         run: |
           set -e
 
-          CODE_PATHS="${{ inputs.include_code }}"
-          DOC_PATHS="${{ inputs.include_documentation }}"
+          CODE_PATHS=$(echo "${{ inputs.include_code }}" | tr ',' ' ')
+          DOC_PATHS=$(echo "${{ inputs.include_documentation }}" | tr ',' ' ')
           BUCKET="${{ inputs.bucket_name }}"
 
           # Funzione per upload: gestisce file e directory
