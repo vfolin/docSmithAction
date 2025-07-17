@@ -12,11 +12,11 @@ on:
       include_code:
         required: false
         type: string
-        default: "."
+        default: ''
       include_documentation:
         required: false
         type: string
-        default: ""
+        default: ''
     secrets:
       AWS_ACCESS_KEY_ID:
         required: true
@@ -57,8 +57,8 @@ jobs:
 
       - name: Get inputs for S3 upload
         run: |
-          IFS=',' read -ra INCLUDE_CODE <<< "${{ inputs.include_code }}"
-          IFS=',' read -ra INCLUDE_DOCUMENTATION <<< "${{ inputs.include_documentations }}"
+          IFS=',' read -r -a INCLUDE_CODE <<< "${{ inputs.include_code }}"
+          IFS=',' read -r -a INCLUDE_DOCUMENTATION <<< "${{ inputs.include_documentations }}"
 
       - name: Upload code to S3
         run: |
