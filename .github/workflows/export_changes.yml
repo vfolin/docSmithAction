@@ -17,6 +17,14 @@ on:
         required: false
         type: string
         default: ''
+      exclude_code:
+        required: false
+        type: string
+        default: ''
+      exclude_documentation:
+        required: false
+        type: string
+        default: ''
     secrets:
       AWS_ACCESS_KEY_ID:
         required: true
@@ -55,41 +63,84 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ inputs.aws_region }}
 
-      - name: Upload selected code and documentation to S3
+      - name: Upload filtered code and documentation to S3
         run: |
-          set -e # eneable exit on error
+          set -e
 
-          CODE_PATHS=$(echo "${{ inputs.include_code }}" | tr ',' ' ')
-          DOC_PATHS=$(echo "${{ inputs.include_documentation }}" | tr ',' ' ')
-          BUCKET="${{ inputs.bucket_name }}"
+          BUCKET="${{ vars.BUCKET_NAME }}"
+          BASE_S3_PATH="s3://$BUCKET/${{ github.event.repository.name }}"
 
-          upload_to_s3() {
-            local src=$1
-            local dest_prefix=$2
+          # Inputs
+          CODE_INCLUDE="${{ inputs.include_code }}"
+          CODE_EXCLUDE="${{ inputs.exclude_code }}"
+          DOC_INCLUDE="${{ inputs.include_documentation }}"
+          DOC_EXCLUDE="${{ inputs.exclude_documentation }}"
 
-            if [ -d "$src" ]; then
-              # Directory: recursive upload into S3
-              aws s3 cp "$src" "s3://$BUCKET/$dest_prefix/$src" --recursive
-            elif [ -f "$src" ]; then
-              # File: single upload
-              aws s3 cp "$src" "s3://$BUCKET/$dest_prefix/$src"
-            else
-              echo "Warning: '$src' does not exist. Skipping upload."
+          # Funzione che identifica se un path è incluso
+          should_include() {
+            local path="$1"
+            local includes="$2"
+            local excludes="$3"
+
+            # Se è nella lista di esclusione → salta
+            for item in ${excludes//,/ }; do
+              item=$(echo "$item" | xargs)  # trim
+              if [[ "$item" == .* && "$path" == *"$item" ]]; then
+                return 1
+              elif [[ "$item" != .* && "$path" == "$item" ]]; then
+                return 1
+              elif [[ "$item" != .* && "$path" == "$item/"* ]]; then
+                return 1
+              fi
+            done
+
+            # Se include è vuoto → includi tutto
+            if [[ -z "$includes" ]]; then
+              return 0
             fi
+
+            # Se è nella lista di inclusione → accetta
+            for item in ${includes//,/ }; do # per ogni elemento della lista
+              item=$(echo "$item" | xargs)  # trim, rimuove spazi iniziali e finali
+              if [[ "$item" == .* && "$path" == *"$item" ]]; then
+                return 0
+              elif [[ "$item" != .* && "$path" == "$item" ]]; then
+                return 0
+              elif [[ "$item" != .* && "$path" == "$item/"* ]]; then
+                return 0
+              fi
+            done
+
+            return 1  # Altrimenti scarta
           }
 
-          # clean up and upload of code files
-          aws s3 rm "s3://$BUCKET/code/" --recursive || true
-          echo "Uploading code paths: $CODE_PATHS"
-          for path in $CODE_PATHS; do
-            upload_to_s3 "$path" "code"
-          done
+          # Funzione che esegue l’upload dei file in base alla logica sopra
+          upload_filtered() {
+            local dest="$1"
+            local includes="$2"
+            local excludes="$3"
 
-          # upload of documentation files
-          echo "Uploading doc paths: $DOC_PATHS"
-          for path in $DOC_PATHS; do
-            upload_to_s3 "$path" "documentation"
-          done
+            echo "🔍 Scanning files for $dest..."
+            find . -type f | while read file; do
+              clean_path="${file#./}" # Rimuove il prefisso "./" dai percorsi
+              if should_include "$clean_path" "$includes" "$excludes"; then
+                echo "✅ Upload: $clean_path → $dest/$clean_path"
+                aws s3 cp "$file" "$BASE_S3_PATH/$dest/$clean_path"
+              else
+                echo "⏭️ Skipped: $clean_path"
+              fi
+            done
+          }
+
+          echo "🧹 Cleaning S3 destinations..."
+          aws s3 rm "$BASE_S3_PATH/code/" --recursive || true
+          aws s3 rm "$BASE_S3_PATH/documentation/" --recursive || true
+
+          echo "🚀 Uploading CODE..."
+          upload_filtered "code" "$CODE_INCLUDE" "$CODE_EXCLUDE"
+
+          echo "📄 Uploading DOCUMENTATION..."
+          upload_filtered "documentation" "$DOC_INCLUDE" "$DOC_EXCLUDE"
 
       - name: Generate repository structure
         run: |
