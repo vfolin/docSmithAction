@@ -76,45 +76,47 @@ jobs:
           DOC_INCLUDE="${{ inputs.include_documentation }}"
           DOC_EXCLUDE="${{ inputs.exclude_documentation }}"
 
-          # Funzione che identifica se un path è incluso
           should_include() {
             local path="$1"
             local includes="$2"
             local excludes="$3"
-
-            # Se è nella lista di esclusione → salta
-            for item in ${excludes//,/ }; do
-              item=$(echo "$item" | xargs)  # trim
+          
+            # Rimuovi spazi extra
+            includes=$(echo "$includes" | tr ',' ' ')
+            excludes=$(echo "$excludes" | tr ',' ' ')
+          
+            # Escludi: match su path, directory, o estensione
+            for item in $excludes; do
+              item=$(echo "$item" | xargs)
               if [[ "$item" == .* && "$path" == *"$item" ]]; then
-                return 1
-              elif [[ "$item" != .* && "$path" == "$item" ]]; then
-                return 1
-              elif [[ "$item" != .* && "$path" == "$item/"* ]]; then
-                return 1
+                return 1  # match su estensione o file nascosto
+              elif [[ "$item" == */ && "$path" == "$item"* ]]; then
+                return 1  # match su directory con /
+              elif [[ "$path" == "$item" ]] || [[ "$path" == "$item/"* ]]; then
+                return 1  # match esatto o dentro cartella
               fi
             done
-
+          
             # Se include è vuoto → includi tutto
             if [[ -z "$includes" ]]; then
               return 0
             fi
-
-            # Se è nella lista di inclusione → accetta
-            for item in ${includes//,/ }; do # per ogni elemento della lista
-              item=$(echo "$item" | xargs)  # trim, rimuove spazi iniziali e finali
+          
+            # Includi se matcha
+            for item in $includes; do
+              item=$(echo "$item" | xargs)
               if [[ "$item" == .* && "$path" == *"$item" ]]; then
                 return 0
-              elif [[ "$item" != .* && "$path" == "$item" ]]; then
+              elif [[ "$item" == */ && "$path" == "$item"* ]]; then
                 return 0
-              elif [[ "$item" != .* && "$path" == "$item/"* ]]; then
+              elif [[ "$path" == "$item" ]] || [[ "$path" == "$item/"* ]]; then
                 return 0
               fi
             done
-
-            return 1  # Altrimenti scarta
+          
+            return 1
           }
 
-          # Funzione che esegue l’upload dei file in base alla logica sopra
           upload_filtered() {
             local dest="$1"
             local includes="$2"
