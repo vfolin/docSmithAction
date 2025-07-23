@@ -73,12 +73,14 @@ jobs:
           DOC_COUNT=$(aws s3 ls "$BASE_S3_PATH/documentation/" | wc -l)
           if [ "$CODE_COUNT" -eq 0 ] && [ "$DOC_COUNT" -eq 0 ]; then
             echo "empty=true" >> $GITHUB_OUTPUT
+            echo "No files found in S3 code and documentation folders."
           else
             echo "empty=false" >> $GITHUB_OUTPUT
+            echo "Files found in S3 code and documentation folders."
           fi
 
-      - name: Complete Upload filtered code and documentation to S3
-        if: steps.check_empty.outputs.empty == 'true'
+      - name: Complete and filtered Upload of code and documentation to S3
+        if: steps.check_empty.outputs.empty == 'false'
         run: |
           set -e
 
@@ -148,7 +150,7 @@ jobs:
             fi
           done
 
-      - name: Upload only code and documentation changed in last commit
+      - name: Upload to S3 only code and documentation changed in last commit
         if: steps.check_empty.outputs.empty == 'false'
         run: |
           set -e
@@ -210,6 +212,52 @@ jobs:
               fi
             fi
           done
+
+      - name: Fast filtered Upload of code and documentation to S3
+        if: steps.check_empty.outputs.empty == 'true'
+        run: |
+          set -e
+
+          to_patterns() {
+            local input="$1"
+            local flag="$2"
+            local patterns=""
+            for item in $(echo "$input" | tr ',' ' '); do
+              item=$(echo "$item" | xargs)
+              if [[ -z "$item" ]]; then continue; fi
+              if [[ "$item" == .* ]]; then
+                patterns="$patterns $flag\"*${item}\""
+              elif [[ "$item" == */ ]]; then
+                patterns="$patterns $flag\"${item}*\""
+              elif [[ "$item" == *.* ]]; then
+                patterns="$patterns $flag\"${item}\""
+              else
+                patterns="$patterns $flag\"${item}/*\" $flag\"${item}\""
+              fi
+            done
+            echo "$patterns"
+          }
+
+          CODE_INCLUDE="${{ inputs.include_code }}"
+          CODE_EXCLUDE="${{ inputs.exclude_code }}"
+          DOC_INCLUDE="${{ inputs.include_documentation }}"
+          DOC_EXCLUDE="${{ inputs.exclude_documentation }}"
+
+          # Code sync
+          CODE_INCLUDE_PATTERNS=$(to_patterns "$CODE_INCLUDE" --include\ )
+          CODE_EXCLUDE_PATTERNS=$(to_patterns "$CODE_EXCLUDE" --exclude\ )
+          echo "🧹 Cleaning S3 code destination..."
+          aws s3 rm "$BASE_S3_PATH/code/" --recursive || true
+          echo "🚀 Syncing code files..."
+          eval aws s3 sync . "$BASE_S3_PATH/code/" --exclude \"*\" $CODE_INCLUDE_PATTERNS $CODE_EXCLUDE_PATTERNS
+
+          # Documentation sync
+          DOC_INCLUDE_PATTERNS=$(to_patterns "$DOC_INCLUDE" --include\ )
+          DOC_EXCLUDE_PATTERNS=$(to_patterns "$DOC_EXCLUDE" --exclude\ )
+          echo "🧹 Cleaning S3 documentation destination..."
+          aws s3 rm "$BASE_S3_PATH/documentation/" --recursive || true
+          echo "🚀 Syncing documentation files..."
+          eval aws s3 sync . "$BASE_S3_PATH/documentation/" --exclude \"*\" $DOC_INCLUDE_PATTERNS $DOC_EXCLUDE_PATTERNS
 
       - name: Generate repository structure
         run: |
