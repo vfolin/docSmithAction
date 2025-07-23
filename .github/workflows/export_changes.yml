@@ -244,20 +244,36 @@ jobs:
           DOC_EXCLUDE="${{ inputs.exclude_documentation }}"
 
           # Code sync
-          CODE_INCLUDE_PATTERNS=$(to_patterns "$CODE_INCLUDE" --include\ )
-          CODE_EXCLUDE_PATTERNS=$(to_patterns "$CODE_EXCLUDE" --exclude\ )
-          echo "🧹 Cleaning S3 code destination..."
-          aws s3 rm "$BASE_S3_PATH/code/" --recursive || true
-          echo "🚀 Syncing code files..."
-          eval aws s3 sync . "$BASE_S3_PATH/code/" --exclude \"*\" $CODE_INCLUDE_PATTERNS $CODE_EXCLUDE_PATTERNS
+          if [[ -z "$CODE_INCLUDE" ]]; then
+            CODE_EXCLUDE_PATTERNS=$(to_patterns "$CODE_EXCLUDE" --exclude\ )
+            echo "🧹 Cleaning S3 code destination..."
+            aws s3 rm "$BASE_S3_PATH/code/" --recursive || true
+            echo "🚀 Syncing all code files except excluded..."
+            eval aws s3 sync . "$BASE_S3_PATH/code/" $CODE_EXCLUDE_PATTERNS
+          else
+            CODE_INCLUDE_PATTERNS=$(to_patterns "$CODE_INCLUDE" --include\ )
+            CODE_EXCLUDE_PATTERNS=$(to_patterns "$CODE_EXCLUDE" --exclude\ )
+            echo "🧹 Cleaning S3 code destination..."
+            aws s3 rm "$BASE_S3_PATH/code/" --recursive || true
+            echo "🚀 Syncing filtered code files..."
+            eval aws s3 sync . "$BASE_S3_PATH/code/" --exclude \"*\" $CODE_INCLUDE_PATTERNS $CODE_EXCLUDE_PATTERNS
+          fi
 
           # Documentation sync
-          DOC_INCLUDE_PATTERNS=$(to_patterns "$DOC_INCLUDE" --include\ )
-          DOC_EXCLUDE_PATTERNS=$(to_patterns "$DOC_EXCLUDE" --exclude\ )
-          echo "🧹 Cleaning S3 documentation destination..."
-          aws s3 rm "$BASE_S3_PATH/documentation/" --recursive || true
-          echo "🚀 Syncing documentation files..."
-          eval aws s3 sync . "$BASE_S3_PATH/documentation/" --exclude \"*\" $DOC_INCLUDE_PATTERNS $DOC_EXCLUDE_PATTERNS
+          if [[ -z "$DOC_INCLUDE" ]]; then
+            DOC_EXCLUDE_PATTERNS=$(to_patterns "$DOC_EXCLUDE" --exclude\ )
+            echo "🧹 Cleaning S3 documentation destination..."
+            aws s3 rm "$BASE_S3_PATH/documentation/" --recursive || true
+            echo "🚀 Syncing all documentation files except excluded..."
+            eval aws s3 sync . "$BASE_S3_PATH/documentation/" $DOC_EXCLUDE_PATTERNS
+          else
+            DOC_INCLUDE_PATTERNS=$(to_patterns "$DOC_INCLUDE" --include\ )
+            DOC_EXCLUDE_PATTERNS=$(to_patterns "$DOC_EXCLUDE" --exclude\ )
+            echo "🧹 Cleaning S3 documentation destination..."
+            aws s3 rm "$BASE_S3_PATH/documentation/" --recursive || true
+            echo "🚀 Syncing filtered documentation files..."
+            eval aws s3 sync . "$BASE_S3_PATH/documentation/" --exclude \"*\" $DOC_INCLUDE_PATTERNS $DOC_EXCLUDE_PATTERNS
+          fi
 
       - name: Generate repository structure
         run: |
