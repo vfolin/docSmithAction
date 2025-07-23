@@ -225,10 +225,11 @@ jobs:
             for item in $(echo "$input" | tr ',' ' '); do
               item=$(echo "$item" | xargs)
               if [[ -z "$item" ]]; then continue; fi
-              if [[ "$item" == .* ]]; then
+              if [[ "$item" == */ ]]; then
+                # Exclude both the folder and its contents
+                patterns="$patterns $flag\"${item%/}\" $flag\"${item%/}/*\""
+              elif [[ "$item" == .* ]]; then
                 patterns="$patterns $flag\"*${item}\""
-              elif [[ "$item" == */ ]]; then
-                patterns="$patterns $flag\"${item}*\""
               elif [[ "$item" == *.* ]]; then
                 patterns="$patterns $flag\"${item}\""
               else
