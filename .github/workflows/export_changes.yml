@@ -109,7 +109,6 @@ jobs:
             read -ra EXCLUDE_ARGS <<< "$(to_patterns "$CODE_EXCLUDE" --exclude)"
             echo "🚀 Syncing all code files except excluded..."
             aws s3 sync . "$BASE_S3_PATH/code/" \
-              --dryrun \
               "${EXCLUDE_ARGS[@]}" \
               --delete
           else
@@ -117,7 +116,6 @@ jobs:
             read -ra EXCLUDE_ARGS <<< "$(to_patterns "$CODE_EXCLUDE" --exclude)"
             echo "🚀 Syncing filtered code files..."
             aws s3 sync . "$BASE_S3_PATH/code/" \
-              --dryrun \  
               --exclude "*" \
               "${INCLUDE_ARGS[@]}" \
               "${EXCLUDE_ARGS[@]}" \
@@ -129,7 +127,6 @@ jobs:
             read -ra EXCLUDE_ARGS <<< "$(to_patterns "$DOC_EXCLUDE" --exclude)"
             echo "🚀 Syncing all documentation files except excluded..."
             aws s3 sync . "$BASE_S3_PATH/documentation/" \
-              --dryrun \
               "${EXCLUDE_ARGS[@]}" \
               --delete
           else
@@ -137,7 +134,6 @@ jobs:
             read -ra EXCLUDE_ARGS <<< "$(to_patterns "$DOC_EXCLUDE" --exclude)"
             echo "🚀 Syncing filtered documentation files..."
            aws s3 sync . "$BASE_S3_PATH/documentation/" \
-            --dryrun \
             --exclude "*" \
             "${INCLUDE_ARGS[@]}" \
             "${EXCLUDE_ARGS[@]}" \
