@@ -79,8 +79,13 @@ jobs:
               item=$(echo "$item" | xargs)
               [[ -z "$item" ]] && continue
           
-              if [[ "$item" == .?* ]]; then 
-                patterns+=("$flag" "*$item")
+              if [[ "$item" == .?* ]]; then  # es: .git, .md
+                if [[ "$item" == */ ]]; then
+                  patterns+=("$flag" "${item%/}")
+                  patterns+=("$flag" "${item%/}/*")
+                else
+                  patterns+=("$flag" "*$item")
+                fi
               elif [[ "$item" == */ ]]; then
                 patterns+=("$flag" "${item%/}")
                 patterns+=("$flag" "${item%/}/*")
@@ -104,13 +109,15 @@ jobs:
             read -ra EXCLUDE_ARGS <<< "$(to_patterns "$CODE_EXCLUDE" --exclude)"
             echo "🚀 Syncing all code files except excluded..."
             aws s3 sync . "$BASE_S3_PATH/code/" \
-                "${EXCLUDE_ARGS[@]}" \
-                --delete
+              --dryrun \
+              "${EXCLUDE_ARGS[@]}" \
+              --delete
           else
             read -ra INCLUDE_ARGS <<< "$(to_patterns "$CODE_INCLUDE" --include)"
             read -ra EXCLUDE_ARGS <<< "$(to_patterns "$CODE_EXCLUDE" --exclude)"
             echo "🚀 Syncing filtered code files..."
             aws s3 sync . "$BASE_S3_PATH/code/" \
+              --dryrun \  
               --exclude "*" \
               "${INCLUDE_ARGS[@]}" \
               "${EXCLUDE_ARGS[@]}" \
@@ -122,13 +129,15 @@ jobs:
             read -ra EXCLUDE_ARGS <<< "$(to_patterns "$DOC_EXCLUDE" --exclude)"
             echo "🚀 Syncing all documentation files except excluded..."
             aws s3 sync . "$BASE_S3_PATH/documentation/" \
-                "${EXCLUDE_ARGS[@]}" \
-                --delete
+              --dryrun \
+              "${EXCLUDE_ARGS[@]}" \
+              --delete
           else
             read -ra INCLUDE_ARGS <<< "$(to_patterns "$DOC_INCLUDE" --include)"
             read -ra EXCLUDE_ARGS <<< "$(to_patterns "$DOC_EXCLUDE" --exclude)"
             echo "🚀 Syncing filtered documentation files..."
            aws s3 sync . "$BASE_S3_PATH/documentation/" \
+            --dryrun \
             --exclude "*" \
             "${INCLUDE_ARGS[@]}" \
             "${EXCLUDE_ARGS[@]}" \
