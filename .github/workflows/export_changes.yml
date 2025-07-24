@@ -73,21 +73,22 @@ jobs:
           to_patterns() {
             local input="$1"
             local flag="$2"
-            local patterns=()
+            local -a patterns=()
             IFS=',' read -ra ITEMS <<< "$input"
             for item in "${ITEMS[@]}"; do
               item=$(echo "$item" | xargs)
               [[ -z "$item" ]] && continue
-              if [[ "$item" == */ ]]; then
+          
+              if [[ "$item" == .?* ]]; then 
+                patterns+=("$flag" "*$item")
+              elif [[ "$item" == */ ]]; then
                 patterns+=("$flag" "${item%/}")
                 patterns+=("$flag" "${item%/}/*")
-              elif [[ "$item" == .* ]]; then
-                patterns+=("$flag" "*$item")
               elif [[ "$item" == *.* ]]; then
-                patterns+=("$flag" "$item")
+                patterns+=("$flag" "*$item")
               else
-                patterns+=("$flag" "${item}/*")
                 patterns+=("$flag" "$item")
+                patterns+=("$flag" "$item/*")
               fi
             done
             echo "${patterns[@]}"
@@ -100,26 +101,38 @@ jobs:
 
           # Code sync
           if [[ -z "$CODE_INCLUDE" ]]; then
-            CODE_EXCLUDE_PATTERNS=$(to_patterns "$CODE_EXCLUDE" --exclude )
+            read -ra EXCLUDE_ARGS <<< "$(to_patterns "$CODE_EXCLUDE" --exclude)"
             echo "🚀 Syncing all code files except excluded..."
-            eval aws s3 sync . "$BASE_S3_PATH/code/" $CODE_EXCLUDE_PATTERNS --delete
+            aws s3 sync . "$BASE_S3_PATH/code/" \
+                "${EXCLUDE_ARGS[@]}" \
+                --delete
           else
-            CODE_INCLUDE_PATTERNS=$(to_patterns "$CODE_INCLUDE" --include )
-            CODE_EXCLUDE_PATTERNS=$(to_patterns "$CODE_EXCLUDE" --exclude )
+            read -ra INCLUDE_ARGS <<< "$(to_patterns "$CODE_INCLUDE" --include)"
+            read -ra EXCLUDE_ARGS <<< "$(to_patterns "$CODE_EXCLUDE" --exclude)"
             echo "🚀 Syncing filtered code files..."
-            eval aws s3 sync . "$BASE_S3_PATH/code/" --exclude "*" $CODE_INCLUDE_PATTERNS $CODE_EXCLUDE_PATTERNS --delete
+            aws s3 sync . "$BASE_S3_PATH/code/" \
+              --exclude "*" \
+              "${INCLUDE_ARGS[@]}" \
+              "${EXCLUDE_ARGS[@]}" \
+              --delete
           fi
 
           # Documentation sync
           if [[ -z "$DOC_INCLUDE" ]]; then
-            DOC_EXCLUDE_PATTERNS=$(to_patterns "$DOC_EXCLUDE" --exclude )
+            read -ra EXCLUDE_ARGS <<< "$(to_patterns "$DOC_EXCLUDE" --exclude)"
             echo "🚀 Syncing all documentation files except excluded..."
-            eval aws s3 sync . "$BASE_S3_PATH/documentation/" $DOC_EXCLUDE_PATTERNS --delete
+            aws s3 sync . "$BASE_S3_PATH/documentation/" \
+                "${EXCLUDE_ARGS[@]}" \
+                --delete
           else
-            DOC_INCLUDE_PATTERNS=$(to_patterns "$DOC_INCLUDE" --include )
-            DOC_EXCLUDE_PATTERNS=$(to_patterns "$DOC_EXCLUDE" --exclude )
+            read -ra INCLUDE_ARGS <<< "$(to_patterns "$DOC_INCLUDE" --include)"
+            read -ra EXCLUDE_ARGS <<< "$(to_patterns "$DOC_EXCLUDE" --exclude)"
             echo "🚀 Syncing filtered documentation files..."
-            eval aws s3 sync . "$BASE_S3_PATH/documentation/" --exclude "*" $DOC_INCLUDE_PATTERNS $DOC_EXCLUDE_PATTERNS --delete
+           aws s3 sync . "$BASE_S3_PATH/documentation/" \
+            --exclude "*" \
+            "${INCLUDE_ARGS[@]}" \
+            "${EXCLUDE_ARGS[@]}" \
+            --delete
           fi
 
       - name: Generate repository structure
