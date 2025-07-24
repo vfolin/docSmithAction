@@ -71,27 +71,26 @@ jobs:
           set -e
 
           to_patterns() {
-            local input="$1" # Input string, can be a comma-separated list
-            local flag="$2" # Flag to use for include/exclude
-            local patterns=""
-            for item in $(echo "$input" | tr ',' ' '); do
+            local input="$1"
+            local flag="$2"
+            local patterns=()
+            IFS=',' read -ra ITEMS <<< "$input"
+            for item in "${ITEMS[@]}"; do
               item=$(echo "$item" | xargs)
-              if [[ -z "$item" ]]; then continue; fi
+              [[ -z "$item" ]] && continue
               if [[ "$item" == */ ]]; then
-                # Handle directories with trailing slash
-                patterns="$patterns $flag\"${item%/}\" $flag\"${item%/}/*\""
+                patterns+=("$flag" "${item%/}")
+                patterns+=("$flag" "${item%/}/*")
               elif [[ "$item" == .* ]]; then
-                # Handle hidden files or directories
-                patterns="$patterns $flag\"*${item}\""
+                patterns+=("$flag" "*$item")
               elif [[ "$item" == *.* ]]; then
-                # Handle files with extensions
-                patterns="$patterns $flag\"${item}\""
+                patterns+=("$flag" "$item")
               else
-                # Handle directories without trailing slash
-                patterns="$patterns $flag\"${item}/*\" $flag\"${item}\""
+                patterns+=("$flag" "${item}/*")
+                patterns+=("$flag" "$item")
               fi
             done
-            echo "$patterns"
+            echo "${patterns[@]}"
           }
 
           CODE_INCLUDE="${{ inputs.include_code }}"
@@ -101,24 +100,24 @@ jobs:
 
           # Code sync
           if [[ -z "$CODE_INCLUDE" ]]; then
-            CODE_EXCLUDE_PATTERNS=$(to_patterns "$CODE_EXCLUDE" --exclude\ )
+            CODE_EXCLUDE_PATTERNS=$(to_patterns "$CODE_EXCLUDE" --exclude )
             echo "🚀 Syncing all code files except excluded..."
             eval aws s3 sync . "$BASE_S3_PATH/code/" $CODE_EXCLUDE_PATTERNS --delete
           else
-            CODE_INCLUDE_PATTERNS=$(to_patterns "$CODE_INCLUDE" --include\ )
-            CODE_EXCLUDE_PATTERNS=$(to_patterns "$CODE_EXCLUDE" --exclude\ )
+            CODE_INCLUDE_PATTERNS=$(to_patterns "$CODE_INCLUDE" --include )
+            CODE_EXCLUDE_PATTERNS=$(to_patterns "$CODE_EXCLUDE" --exclude )
             echo "🚀 Syncing filtered code files..."
             eval aws s3 sync . "$BASE_S3_PATH/code/" --exclude "*" $CODE_INCLUDE_PATTERNS $CODE_EXCLUDE_PATTERNS --delete
           fi
 
           # Documentation sync
           if [[ -z "$DOC_INCLUDE" ]]; then
-            DOC_EXCLUDE_PATTERNS=$(to_patterns "$DOC_EXCLUDE" --exclude\ )
+            DOC_EXCLUDE_PATTERNS=$(to_patterns "$DOC_EXCLUDE" --exclude )
             echo "🚀 Syncing all documentation files except excluded..."
             eval aws s3 sync . "$BASE_S3_PATH/documentation/" $DOC_EXCLUDE_PATTERNS --delete
           else
-            DOC_INCLUDE_PATTERNS=$(to_patterns "$DOC_INCLUDE" --include\ )
-            DOC_EXCLUDE_PATTERNS=$(to_patterns "$DOC_EXCLUDE" --exclude\ )
+            DOC_INCLUDE_PATTERNS=$(to_patterns "$DOC_INCLUDE" --include )
+            DOC_EXCLUDE_PATTERNS=$(to_patterns "$DOC_EXCLUDE" --exclude )
             echo "🚀 Syncing filtered documentation files..."
             eval aws s3 sync . "$BASE_S3_PATH/documentation/" --exclude "*" $DOC_INCLUDE_PATTERNS $DOC_EXCLUDE_PATTERNS --delete
           fi
