@@ -66,21 +66,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ inputs.aws_region }}
 
-#      - name: Check if S3 code and documentation folders are empty
-#        id: check_empty
-#        run: |
-#          CODE_COUNT=$(aws s3 ls "$BASE_S3_PATH/code/" | wc -l)
-#          DOC_COUNT=$(aws s3 ls "$BASE_S3_PATH/documentation/" | wc -l)
-#          if [ "$CODE_COUNT" -eq 0 ] && [ "$DOC_COUNT" -eq 0 ]; then
-#            echo "empty=true" >> $GITHUB_OUTPUT
-#            echo "No files found in S3 code and documentation folders."
-#          else
-#            echo "empty=false" >> $GITHUB_OUTPUT
-#            echo "Files found in S3 code and documentation folders."
-#          fi
-
       - name: Sync of code and documentation to S3
-        # if: steps.check_empty.outputs.empty == 'true'
         run: |
           set -e
 
@@ -116,15 +102,11 @@ jobs:
           # Code sync
           if [[ -z "$CODE_INCLUDE" ]]; then
             CODE_EXCLUDE_PATTERNS=$(to_patterns "$CODE_EXCLUDE" --exclude\ )
-#            echo "🧹 Cleaning S3 code destination..."
-#            aws s3 rm "$BASE_S3_PATH/code/" --recursive || true
             echo "🚀 Syncing all code files except excluded..."
             eval aws s3 sync . "$BASE_S3_PATH/code/" $CODE_EXCLUDE_PATTERNS --delete
           else
             CODE_INCLUDE_PATTERNS=$(to_patterns "$CODE_INCLUDE" --include\ )
             CODE_EXCLUDE_PATTERNS=$(to_patterns "$CODE_EXCLUDE" --exclude\ )
-#            echo "🧹 Cleaning S3 code destination..."
-#            aws s3 rm "$BASE_S3_PATH/code/" --recursive || true
             echo "🚀 Syncing filtered code files..."
             eval aws s3 sync . "$BASE_S3_PATH/code/" --exclude "*" $CODE_INCLUDE_PATTERNS $CODE_EXCLUDE_PATTERNS --delete
           fi
@@ -132,81 +114,14 @@ jobs:
           # Documentation sync
           if [[ -z "$DOC_INCLUDE" ]]; then
             DOC_EXCLUDE_PATTERNS=$(to_patterns "$DOC_EXCLUDE" --exclude\ )
-#            echo "🧹 Cleaning S3 documentation destination..."
-#            aws s3 rm "$BASE_S3_PATH/documentation/" --recursive || true
             echo "🚀 Syncing all documentation files except excluded..."
             eval aws s3 sync . "$BASE_S3_PATH/documentation/" $DOC_EXCLUDE_PATTERNS --delete
           else
             DOC_INCLUDE_PATTERNS=$(to_patterns "$DOC_INCLUDE" --include\ )
             DOC_EXCLUDE_PATTERNS=$(to_patterns "$DOC_EXCLUDE" --exclude\ )
-#            echo "🧹 Cleaning S3 documentation destination..."
-#            aws s3 rm "$BASE_S3_PATH/documentation/" --recursive || true
             echo "🚀 Syncing filtered documentation files..."
             eval aws s3 sync . "$BASE_S3_PATH/documentation/" --exclude "*" $DOC_INCLUDE_PATTERNS $DOC_EXCLUDE_PATTERNS --delete
           fi
-
-#      - name: Upload to S3 only code and documentation changed in last commit
-#        if: steps.check_empty.outputs.empty == 'false'
-#        run: |
-#          set -e
-#
-#          CODE_INCLUDE="${{ inputs.include_code }}"
-#          CODE_EXCLUDE="${{ inputs.exclude_code }}"
-#          DOC_INCLUDE="${{ inputs.include_documentation }}"
-#          DOC_EXCLUDE="${{ inputs.exclude_documentation }}"
-#
-#          should_include() {
-#            local path="$1"
-#            local includes="$2"
-#            local excludes="$3"
-#
-#            includes=$(echo "$includes" | tr ',' ' ')
-#            excludes=$(echo "$excludes" | tr ',' ' ')
-#
-#            for item in $excludes; do
-#              item=$(echo "$item" | xargs)
-#              if [[ "$item" == .* && "$path" == *"$item" ]]; then
-#                return 1
-#              elif [[ "$item" == */ && "$path" == "$item"* ]]; then
-#                return 1
-#              elif [[ "$path" == "$item" ]] || [[ "$path" == "$item/"* ]]; then
-#                return 1
-#              fi
-#            done
-#
-#            if [[ -z "$includes" ]]; then
-#              return 0
-#            fi
-#
-#            for item in $includes; do
-#              item=$(echo "$item" | xargs)
-#              if [[ "$item" == .* && "$path" == *"$item" ]]; then
-#                return 0
-#              elif [[ "$item" == */ && "$path" == "$item"* ]]; then
-#                return 0
-#              elif [[ "$path" == "$item" ]] || [[ "$path" == "$item/"* ]]; then
-#                return 0
-#              fi
-#            done
-#
-#            return 1
-#          }
-#
-#          echo "🔍 Checking changed files in last commit..."
-#          git diff --name-only $COMMIT_ID^ $COMMIT_ID | while read file; do
-#            clean_path="${file#./}"
-#            if [[ -f "$file" ]]; then
-#              if should_include "$clean_path" "$CODE_INCLUDE" "$CODE_EXCLUDE"; then
-#                echo "✅ Upload CODE: $clean_path"
-#                aws s3 cp "$file" "$BASE_S3_PATH/code/$clean_path"
-#              elif should_include "$clean_path" "$DOC_INCLUDE" "$DOC_EXCLUDE"; then
-#                echo "✅ Upload DOCUMENTATION: $clean_path"
-#                aws s3 cp "$file" "$BASE_S3_PATH/documentation/$clean_path"
-#              else
-#                echo "⏭️ Skipped: $clean_path"
-#              fi
-#            fi
-#          done
 
       - name: Generate repository structure
         run: |
